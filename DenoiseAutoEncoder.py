@@ -4,52 +4,55 @@ import numpy as np
 from tensorflow.keras.layers import Input, Conv3DTranspose, ConvLSTM2D
 from tensorflow.keras.models import Model
 
-def calculate_optical_flow(video_path):
-    cap = cv2.VideoCapture(video_path)
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+def calculate_optical_flow(frame_directory):
+    frame_files = sorted(file for file in os.listdir(frame_directory) if file.endswith('.tif'))
+    print(frame_files)  # Add this line to check the frame files
+
+    frame_count = len(frame_files)
+    print(frame_count)  # Add this line to check the frame count
+
+    # Read the first frame to get its dimensions
+    first_frame = cv2.imread(os.path.join(frame_directory, frame_files[0]))
+    if first_frame is None:
+        print("Error: Failed to read the first frame")
+        return None
+
+    frame_height, frame_width, _ = first_frame.shape
 
     # Create an empty array to store the optical flow map volume
-    optical_flow_volume = np.zeros((8, frame_height, frame_width, 3), dtype=np.float32)
+    optical_flow_volume = np.zeros((frame_count - 1, frame_height, frame_width, 2), dtype=np.float32)
 
-    # Read the first frame
-    ret, prev_frame = cap.read()
-    prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
+    prev_gray = cv2.cvtColor(first_frame, cv2.COLOR_BGR2GRAY)
 
-    frame_index = 0
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+    for frame_index in range(1, frame_count):
+        frame = cv2.imread(os.path.join(frame_directory, frame_files[frame_index]))
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
-        flow_norm = cv2.normalize(flow, None, 0, 255, cv2.NORM_MINMAX)
 
-        # Store the normalized optical flow in the optical flow map volume
-        if frame_index < 8:
-            optical_flow_volume[frame_index] = flow_norm
+        # Store the optical flow in the optical flow map volume
+        optical_flow_volume[frame_index - 1, :, :, 0] = flow[..., 0]
+        optical_flow_volume[frame_index - 1, :, :, 1] = flow[..., 1]
 
         prev_gray = gray
-        frame_index += 1
 
-    cap.release()
     return optical_flow_volume
 
 
-def calculate_optical_flow_dataset(dataset_path):
+def calculate_optical_flow_datasets(paths):
     optical_flow_dataset = []
 
-    # Loop through the video files in the dataset directory
-    for video_file in os.listdir(dataset_path):
-        video_path = os.path.join(dataset_path, video_file)
-        optical_flow_video = calculate_optical_flow(video_path)
-        optical_flow_dataset.append(optical_flow_video)
+    for dataset_path in paths:
+        # Loop through the directories in the dataset directory
+        for video_directory in os.listdir(dataset_path):
+            video_path = os.path.join(dataset_path, video_directory)
+            optical_flow_video = calculate_optical_flow(video_path)
+            optical_flow_dataset.append(optical_flow_video)
 
     # Convert the list of optical flow arrays to a numpy array
     optical_flow_dataset = np.array(optical_flow_dataset)
 
     return optical_flow_dataset
+
 
 
 def create_AE(frames, height, width, channels):
@@ -77,9 +80,10 @@ def train_model(autoencoder, optical_flow_dataset, batch_size, num_epochs):
     return autoencoder
 
 
+
 # Example usage
 dataset_path = 'path/to/optical_flow_dataset'
-optical_flow_dataset = calculate_optical_flow_dataset(dataset_path)
+optical_flow_dataset = calculate_optical_flow_datasets(["UCSDped1/Train/", "UCSDped2/Train/"])
 
 frames, height, width, channels = optical_flow_dataset.shape[1:]
 autoencoder = create_AE(frames, height, width, channels)
