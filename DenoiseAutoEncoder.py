@@ -67,7 +67,7 @@ def calculate_optical_flow_datasets(paths):
 
     # Resize and pad the optical flow datasets to have the same shape
     for opt_flow in optical_flow_dataset:
-        frames, height, width, _ = opt_flow.shape
+        frames, height, width, channels = opt_flow.shape
         if frames < max_frames or height < max_height or width < max_width:
             # Pad the optical flow dataset with zeros
             padding_frames = max_frames - frames
@@ -85,26 +85,27 @@ def calculate_optical_flow_datasets(paths):
     return np.array(resized_optical_flow_dataset), max_height, max_width, channels, max_frames
 
 
-def create_AE(frames, height, width, channels):
-    input_shape = (frames, height, width, channels)  # Define the input shape based on your optical flow data
+def create_AE(optical_flow_dataset):
+    num_datasets, frames, height, width, channels = optical_flow_dataset.shape
 
     # Encoder
-    input_data = Input(shape=input_shape)
-    encoded = Conv3D(128, (3, 3, channels), activation='relu', padding='same')(input_data)
+    input_data = Input(shape=(frames, height, width, channels))
+    encoded = Conv3D(128, (3, 3, 3), activation='relu', padding='same')(input_data)
     encoded = MaxPooling3D((2, 2, 1), padding='same')(encoded)
-    encoded = Conv3D(64, (3, 3, channels), activation='relu', padding='same')(encoded)
+    encoded = Conv3D(64, (3, 3, 3), activation='relu', padding='same')(encoded)
     encoded = MaxPooling3D((2, 2, 1), padding='same')(encoded)
     encoded = ConvLSTM2D(64, (3, 3), padding='same', return_sequences=True)(encoded)
     encoded = ConvLSTM2D(32, (3, 3), padding='same', return_sequences=True)(encoded)
     encoded = ConvLSTM2D(64, (3, 3), padding='same', return_sequences=True)(encoded)
 
     # Decoder
-    decoded = Conv3DTranspose(64, (3, 3, channels), strides=(2, 2, 1), padding='same', activation='relu')(encoded)
-    decoded = Conv3DTranspose(128, (3, 3, channels), strides=(2, 2, 1), padding='same', activation='relu')(decoded)
-    decoded = Conv3D(2, (3, 3, channels), activation='sigmoid', padding='same')(decoded)
+    decoded = Conv3DTranspose(64, (3, 3, 3), strides=(2, 2, 1), padding='same', activation='relu')(encoded)
+    decoded = Conv3DTranspose(128, (3, 3, 3), strides=(2, 2, 1), padding='same', activation='relu')(decoded)
+    decoded = Conv3D(3, (3, 3, 3), activation='sigmoid', padding='same')(decoded)
 
     # Autoencoder model
     return Model(input_data, decoded)
+
 
 
 
@@ -135,6 +136,7 @@ def resize_optical_flow_dataset(optical_flow_dataset):
 def train_model(autoencoder, optical_flow_dataset, batch_size, num_epochs):
 
     autoencoder.compile(optimizer='adam', loss='mae')
+
     autoencoder.fit(
         optical_flow_dataset,
         optical_flow_dataset,
@@ -145,9 +147,11 @@ def train_model(autoencoder, optical_flow_dataset, batch_size, num_epochs):
 
 
 optical_flow_dataset, height, width, channels, frames = calculate_optical_flow_datasets(["UCSDped1/Train/", "UCSDped2/Train/"])
+
+print(optical_flow_dataset.shape)
 print("{}, {}, {}, {}".format(height, width, channels, frames))
 
-autoencoder = create_AE(frames, height, width, channels)
+autoencoder = create_AE(optical_flow_dataset)
 
 batch_size = 16
 num_epochs = 10
