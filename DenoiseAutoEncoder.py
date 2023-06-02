@@ -90,21 +90,23 @@ def create_AE(frames, height, width, channels):
 
     # Encoder
     input_data = Input(shape=input_shape)
-    encoded = Conv3D(128, (3, 3, 3), activation='relu', padding='same')(input_data)
-    encoded = MaxPooling3D((2, 2, 2), padding='same')(encoded)
-    encoded = Conv3D(64, (3, 3, 3), activation='relu', padding='same')(encoded)
-    encoded = MaxPooling3D((2, 2, 2), padding='same')(encoded)
+    encoded = Conv3D(128, (3, 3, channels), activation='relu', padding='same')(input_data)
+    encoded = MaxPooling3D((2, 2, 1), padding='same')(encoded)
+    encoded = Conv3D(64, (3, 3, channels), activation='relu', padding='same')(encoded)
+    encoded = MaxPooling3D((2, 2, 1), padding='same')(encoded)
     encoded = ConvLSTM2D(64, (3, 3), padding='same', return_sequences=True)(encoded)
     encoded = ConvLSTM2D(32, (3, 3), padding='same', return_sequences=True)(encoded)
     encoded = ConvLSTM2D(64, (3, 3), padding='same', return_sequences=True)(encoded)
 
     # Decoder
-    decoded = Conv3DTranspose(64, (3, 3, 3), strides=(2, 2, 2), padding='same', activation='relu')(encoded)
-    decoded = Conv3DTranspose(128, (3, 3, 3), strides=(2, 2, 2), padding='same', activation='relu')(decoded)
-    decoded = Conv3D(2, (3, 3, 3), activation='sigmoid', padding='same')(decoded)
+    decoded = Conv3DTranspose(64, (3, 3, channels), strides=(2, 2, 1), padding='same', activation='relu')(encoded)
+    decoded = Conv3DTranspose(128, (3, 3, channels), strides=(2, 2, 1), padding='same', activation='relu')(decoded)
+    decoded = Conv3D(2, (3, 3, channels), activation='sigmoid', padding='same')(decoded)
 
     # Autoencoder model
     return Model(input_data, decoded)
+
+
 
 
 
