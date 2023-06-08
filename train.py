@@ -183,7 +183,20 @@ def build_lstm_autoencoder(shape):
     # Autoencoder model
     return model
 
-def train_model(model, filename, windowed_optical_flows):
+def data_generator(windowed_optical_flows, batch_size):
+    num_samples = len(windowed_optical_flows)
+    num_batches = num_samples // batch_size
+
+    while True:
+        np.random.shuffle(windowed_optical_flows)  # Shuffle the data before each epoch
+        for batch_index in range(num_batches):
+            batch_start = batch_index * batch_size
+            batch_end = (batch_index + 1) * batch_size
+            batch_data = windowed_optical_flows[batch_start:batch_end]
+
+            yield batch_data, batch_data
+
+def train_model(model, filename, windowed_optical_flows, optimizer):
     x_train = np.array(windowed_optical_flows)
     model.fit(x_train, x_train, epochs=10, batch_size=32)
     # Save the trained model
@@ -192,6 +205,7 @@ def train_model(model, filename, windowed_optical_flows):
 
 
 if __name__ == "__main__":
+
     paths = ["UCSDped1/Train/", "UCSDped2/Train/"]
     #max_height, max_width, max_frames = calculate_max_dimensions(paths)
     #x_train = get_movie("Train001/", 200)
