@@ -27,6 +27,7 @@ def resize_frames(frames, target_size):
 def get_movie(path, max_frames):
     frame_files = sorted(file for file in os.listdir(path) if file.endswith('.tif'))
     num_frames = len(frame_files)
+
     # Duplicate frames if the number of frames is smaller than max_frames
     if num_frames < max_frames:
         duplication_factor = max_frames // num_frames
@@ -35,21 +36,26 @@ def get_movie(path, max_frames):
         frame_files += duplicated_frames
     elif num_frames > max_frames:
         frame_files = frame_files[:max_frames]
+    else:
+        frame_files = frame_files
 
-    resized_frames = resize_frames([os.path.join(path, file) for file in frame_files],
-                                   (320, 180))
+    resized_frames = resize_frames([os.path.join(path, file) for file in frame_files], (320, 180))
 
     return np.array(resized_frames)
 
 def get_data(paths, max_frames):
-    x_train = []
+    dataset = []
     for dataset_path in paths:
         for video_directory in os.listdir(dataset_path):
             video_path = os.path.join(dataset_path, video_directory)
             video = get_movie(video_path, max_frames)
-            x_train.append(video)
+            dataset.append(video)
+            print(video.shape)
+    dataset = [video for video in dataset if
+                          video.shape == (max_frames, height, width, desired_no_channels)]
 
-    return np.array(x_train)
+    dataset = np.stack(dataset)
+    return dataset
 
 
 def calculate_max_dimensions(paths):
